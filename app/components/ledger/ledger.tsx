@@ -35,6 +35,8 @@ const sortOptions: { value: SortKey; label: string }[] = [
   { value: "status-asc", label: "Status" },
 ];
 
+const tesseractAssetPath = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/tesseract`;
+
 function getNumber(formData: FormData, field: string) {
   return Number(formData.get(field));
 }
@@ -104,9 +106,9 @@ function TradeForm({
     try {
       const { createWorker } = await import("tesseract.js");
       const worker = await createWorker("eng", undefined, {
-        workerPath: "/tesseract/worker.min.js",
-        corePath: "/tesseract/tesseract-core.wasm.js",
-        langPath: "/tesseract",
+        workerPath: `${tesseractAssetPath}/worker.min.js`,
+        corePath: `${tesseractAssetPath}/tesseract-core.wasm.js`,
+        langPath: tesseractAssetPath,
       });
       const result = await worker.recognize(file);
       await worker.terminate();
