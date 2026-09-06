@@ -18,6 +18,7 @@ const navigation = [
   { href: "/ledger/magus", label: "Magus", icon: ShoppingBag },
 ];
 
+/** Renders the persistent navigation shell around each application route. */
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 

@@ -39,6 +39,7 @@ function updateEntry(
   };
 }
 
+/** Adds a new pending trade with its entry cost and no recorded sale. */
 export function addTrade(input: CreateTradeInput) {
   const timestamp = now();
   const entry: TradeEntry = {
@@ -62,6 +63,7 @@ export function addTrade(input: CreateTradeInput) {
   }));
 }
 
+/** Records a trade's sell price and marks the entry as sold. */
 export function completeSale(entryId: string, input: CompleteSaleInput) {
   trackerStorage.set((state) =>
     updateEntry(state, entryId, (entry) => ({
@@ -74,6 +76,7 @@ export function completeSale(entryId: string, input: CompleteSaleInput) {
   );
 }
 
+/** Replaces the editable entry details while retaining its sale state. */
 export function updateTrade(entryId: string, input: UpdateTradeInput) {
   trackerStorage.set((state) =>
     updateEntry(state, entryId, (entry) => ({
@@ -88,6 +91,7 @@ export function updateTrade(entryId: string, input: UpdateTradeInput) {
   );
 }
 
+/** Permanently removes a trade entry from the locally persisted tracker. */
 export function deleteTrade(entryId: string) {
   trackerStorage.set((state) => ({
     ...state,

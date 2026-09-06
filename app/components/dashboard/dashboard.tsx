@@ -148,6 +148,7 @@ function RecentMovements({ commercialType }: { commercialType: CommercialType })
   );
 }
 
+/** Renders the interactive Kama overview dashboard and its timeline controls. */
 export function Dashboard() {
   const [timeline, setTimeline] = useState<Timeline>("30d");
   const { state } = useTracker();

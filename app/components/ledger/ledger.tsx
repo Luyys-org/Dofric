@@ -248,6 +248,7 @@ function sortEntries(entries: TradeEntry[], sort: SortKey) {
   });
 }
 
+/** Renders one commercial-type ledger with its CRUD, filtering, and sale workflows. */
 export function Ledger({ commercialType }: { commercialType: CommercialType }) {
   const { state, deleteTrade } = useTracker();
   const [query, setQuery] = useState("");

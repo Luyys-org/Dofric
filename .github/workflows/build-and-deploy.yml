@@ -1,0 +1,41 @@
+name: Build and deploy to GitHub Pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      trigger-release:
+        description: "Trigger a release"
+        type: boolean
+        default: false
+      version-type:
+        description: "Version type to bump (patch, minor, major)"
+        type: choice
+        options: ["patch", "minor", "major"]
+        required: true
+
+jobs:
+  build-static:
+    uses: Luyys-org/workflows/.github/workflows/npm-build.yml@main
+    with:
+      node-version: "24.14.1"
+      application-name: "Dofric"
+  
+  deploy-pages:
+    needs: build-static
+    permissions:
+      contents: read
+      actions: read
+      pages: write
+      id-token: write
+    uses: Luyys-org/workflows/.github/workflows/deploy-page.yml@main
+    with:
+      artifact-name: ${{ needs.build-static.outputs.artifact-name }}
+
+  bump-version:
+    needs: deploy-pages
+    if: ${{ github.event.inputs.trigger-release == 'true' }}
+    permissions:
+      contents: write
+    uses: Luyys-org/workflows/.github/workflows/npm-version-bump.yml@main
+    with:
+      update-type: ${{ github.event.inputs.version-type }}

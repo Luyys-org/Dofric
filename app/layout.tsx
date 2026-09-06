@@ -18,6 +18,7 @@ export const metadata: Metadata = {
   description: "A personal Dofus Kama financial tracker.",
 };
 
+/** Defines the root document and shared application navigation for every route. */
 export default function RootLayout({
   children,
 }: Readonly<{

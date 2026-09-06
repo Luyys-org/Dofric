@@ -20,10 +20,12 @@ const TIMELINE_DAYS: Record<Exclude<Timeline, "all">, number> = {
   "90d": 90,
 };
 
+/** Returns a sold entry's realized profit, or `null` while its sale is open. */
 export function getEntryProfit(entry: TradeEntry) {
   return entry.sellPrice === null ? null : entry.sellPrice - entry.entryCost;
 }
 
+/** Checks whether a non-null date falls within the requested reporting timeline. */
 export function isInTimeline(date: string | null, timeline: Timeline) {
   if (!date || timeline === "all") return Boolean(date);
 
@@ -34,6 +36,7 @@ export function isInTimeline(date: string | null, timeline: Timeline) {
   return new Date(date) >= cutoff;
 }
 
+/** Calculates sales, expenses, and counts for one commercial type and timeline. */
 export function getCommercialTotals(
   state: KamaTrackerState,
   commercialType: CommercialType,
@@ -66,6 +69,7 @@ export function getCommercialTotals(
   };
 }
 
+/** Calculates tracker-wide sales, expenses, realized balance, and open listings. */
 export function getTrackerTotals(
   state: KamaTrackerState,
   timeline: Timeline = "all",
@@ -93,6 +97,7 @@ export function getTrackerTotals(
   };
 }
 
+/** Returns the most recently changed entries for a commercial type. */
 export function getLatestEntries(
   state: KamaTrackerState,
   commercialType: CommercialType,
