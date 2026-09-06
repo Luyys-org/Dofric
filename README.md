@@ -8,10 +8,11 @@ The application is deliberately browser-local: it does not require an account, A
 
 - Dashboard with total sales, expenses, realized balance, and open listings.
 - Sales and expense bar charts by commercial type for 7, 30, or 90 days, or all time.
-- Latest movement lists for Buy / Resell, Crafting, and Magus activities.
+- Latest movement lists for Buy / Resell, Crafting, Shattering, and Magus activities.
 - Separate CRUD ledgers for each commercial type.
 - Item search, status filtering, and sorting by date, item name, costs, sales, profit, or status.
 - Two-stage selling workflow: record the item and entry cost first, then complete the sale whenever it occurs.
+- Shattering rune management with individual rune sales and automatic partial-sale tracking.
 - Optional local screenshot OCR for pricing logs, with selectable detected values and automatic total calculation.
 - Responsive navigation, data tables, and dialogs for desktop and small screens.
 
@@ -21,6 +22,7 @@ The application is deliberately browser-local: it does not require an account, A
 | --- | --- |
 | Buy / Resell | Buy an item, then resell it for a higher price. |
 | Crafting | Buy raw materials and sell the resulting crafted item. |
+| Shattering | Shatter equipment into runes for resale. |
 | Magus | Sell enchanted or improved equipment. |
 
 ## Requirements
@@ -60,16 +62,24 @@ Open the local URL printed by Next.js, normally `http://localhost:3000`. Next.js
 1. Open the appropriate commercial ledger.
 2. Select **New entry**.
 3. Enter the item name, total entry cost, quantity, entry date, and optional notes.
-4. Save the entry. Its status is `NOT SOLD` until a sale is recorded.
+4. Save the entry. Its status is `NOT SOLD` until a sale is recorded. Shattering entries remain open until their rune sales are recorded.
+
+### Record shattering rune sales
+
+1. In the Shattering ledger, select the rune-management action for an entry.
+2. Add every produced rune and its quantity.
+3. Select the check action for each rune once its stack sells, then enter its total price and sale date.
+4. The entry becomes `PARTIALLY SOLD` after its first rune sale and `SOLD` when every recorded rune is sold.
+5. Select the entry check action to force completion, recording one final total when individual rune tracking is not needed.
 
 ### Record a sale
 
 1. Find an open entry in its ledger.
 2. Select the check action in that row.
 3. Enter the total sell price and sale date.
-4. Complete the sale. The entry becomes `SOLD`, and its realized profit is calculated as `sell price - entry cost`.
+4. Complete the sale. The entry becomes `SOLD`, and its realized profit is calculated as `sell price - entry cost`. For Shattering, this action force-completes the entry instead of changing individual rune sales.
 
-### Scan a screenshot for crafting costs
+### Scan a screenshot for crafting or shattering costs
 
 1. In the new-entry dialog, select **Scan screenshot** below the Entry cost field.
 2. Choose a PNG, JPEG, or WebP screenshot.
@@ -86,6 +96,7 @@ OCR runs in the browser with Tesseract. It recognizes the price pattern used in 
 | `/` | Kama overview dashboard |
 | `/ledger/buy-resell` | Buy / Resell ledger |
 | `/ledger/crafting` | Crafting ledger |
+| `/ledger/shattering` | Shattering ledger |
 | `/ledger/magus` | Magus ledger |
 
 ## Data And Privacy
@@ -104,7 +115,7 @@ The OCR worker, WebAssembly core, and English language data are served from `pub
 | Area | Responsibility |
 | --- | --- |
 | `app/` | Next.js App Router pages, application shell, styling, and feature-local dashboard and ledger UI. |
-| `app/ledger/[commercialType]/` | Static routes for the three supported commercial ledgers. |
+| `app/ledger/[commercialType]/` | Static routes for the four supported commercial ledgers. |
 | `lib/storage/` | SSR-safe typed browser storage built on `useSyncExternalStore`. |
 | `lib/kama-tracker/` | Tracker persistence facade, React hook, analytics, formatting, OCR parsing, and route resolution. |
 | `types/kama-tracker.ts` | Shared commercial, sale, and trade-record contracts. |
@@ -116,7 +127,8 @@ Feature components do not import each other. Shared behavior is exposed through 
 
 - Expenses are counted on an entry's acquisition date.
 - Sales are counted on an entry's sale date.
-- A pending entry contributes to expenses and open listings, but not to sales or realized profit.
+- Shattering sales are counted on each individual rune's sale date; force-completed Shattering entries use their recorded total and completion date.
+- An open or partially sold entry contributes to expenses and open listings. A Shattering entry's recorded rune sales contribute to sales and realized profit immediately.
 - Dashboard timeline controls change only the displayed calculations. They never remove stored records.
 
 ## Scope And Future Work
@@ -132,4 +144,4 @@ npm run lint
 npm run build
 ```
 
-For interactive changes, also verify a pending entry, sale completion, table filters and sorting, dashboard timeline controls, persistence after refresh, and screenshot OCR in the browser.
+For interactive changes, also verify a pending entry, individual Shattering rune sales, partial and completed statuses, force completion, table filters and sorting, dashboard timeline controls, persistence after refresh, and screenshot OCR in the browser.

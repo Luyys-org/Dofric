@@ -1,8 +1,12 @@
 import { createBrowserStorage } from "@/lib/storage";
 import type {
+  AddShatteringRuneInput,
+  CompleteRuneSaleInput,
   CompleteSaleInput,
   CreateTradeInput,
   KamaTrackerState,
+  SaleStatus,
+  ShatteringRune,
   TradeEntry,
   UpdateTradeInput,
 } from "@/types/kama-tracker";
@@ -39,6 +43,29 @@ function updateEntry(
   };
 }
 
+function getShatteringStatus(entry: TradeEntry, runes: ShatteringRune[]): SaleStatus {
+  if (entry.forcedSold || runes.length === 0) return entry.forcedSold ? "SOLD" : "NOT_SOLD";
+  if (runes.every((rune) => rune.status === "SOLD")) return "SOLD";
+  return runes.some((rune) => rune.status === "SOLD") ? "PARTIALLY_SOLD" : "NOT_SOLD";
+}
+
+function synchronizeShatteringSale(entry: TradeEntry, runes: ShatteringRune[]): TradeEntry {
+  if (entry.forcedSold) return { ...entry, runes };
+
+  const soldRunes = runes.filter((rune) => rune.status === "SOLD");
+  return {
+    ...entry,
+    runes,
+    status: getShatteringStatus(entry, runes),
+    sellPrice: soldRunes.length > 0 ? soldRunes.reduce((sum, rune) => sum + (rune.sellPrice ?? 0), 0) : null,
+    soldAt: soldRunes.reduce<string | null>(
+      (latest, rune) => (!latest || (rune.soldAt && rune.soldAt > latest) ? rune.soldAt : latest),
+      null,
+    ),
+    updatedAt: now(),
+  };
+}
+
 /** Adds a new pending trade with its entry cost and no recorded sale. */
 export function addTrade(input: CreateTradeInput) {
   const timestamp = now();
@@ -71,8 +98,76 @@ export function completeSale(entryId: string, input: CompleteSaleInput) {
       status: "SOLD",
       sellPrice: input.sellPrice,
       soldAt: input.soldAt ?? today(),
+      forcedSold: entry.commercialType === "shattering" ? true : entry.forcedSold,
       updatedAt: now(),
     })),
+  );
+}
+
+/** Adds a rune produced by a shattering entry. */
+export function addShatteringRune(entryId: string, input: AddShatteringRuneInput) {
+  const name = input.name.trim();
+  const quantity = input.quantity ?? 1;
+  if (!name || quantity <= 0) return;
+
+  trackerStorage.set((state) =>
+    updateEntry(state, entryId, (entry) => {
+      if (entry.commercialType !== "shattering") return entry;
+      const rune: ShatteringRune = {
+        id: createId(),
+        name,
+        quantity,
+        status: "NOT_SOLD",
+        sellPrice: null,
+        soldAt: null,
+      };
+      return synchronizeShatteringSale(entry, [...(entry.runes ?? []), rune]);
+    }),
+  );
+}
+
+/** Records the sale of one rune produced by a shattering entry. */
+export function completeRuneSale(
+  entryId: string,
+  runeId: string,
+  input: CompleteRuneSaleInput,
+) {
+  trackerStorage.set((state) =>
+    updateEntry(state, entryId, (entry) => {
+      if (entry.commercialType !== "shattering" || entry.forcedSold) return entry;
+      const runes = (entry.runes ?? []).map((rune) =>
+        rune.id === runeId
+          ? { ...rune, status: "SOLD" as const, sellPrice: input.sellPrice, soldAt: input.soldAt ?? today() }
+          : rune,
+      );
+      return synchronizeShatteringSale(entry, runes);
+    }),
+  );
+}
+
+/** Reopens a rune sale so its price and date no longer contribute to the entry total. */
+export function reopenRuneSale(entryId: string, runeId: string) {
+  trackerStorage.set((state) =>
+    updateEntry(state, entryId, (entry) => {
+      if (entry.commercialType !== "shattering" || entry.forcedSold) return entry;
+      const runes = (entry.runes ?? []).map((rune) =>
+        rune.id === runeId
+          ? { ...rune, status: "NOT_SOLD" as const, sellPrice: null, soldAt: null }
+          : rune,
+      );
+      return synchronizeShatteringSale(entry, runes);
+    }),
+  );
+}
+
+/** Removes a rune from a shattering entry. */
+export function deleteShatteringRune(entryId: string, runeId: string) {
+  trackerStorage.set((state) =>
+    updateEntry(state, entryId, (entry) => {
+      if (entry.commercialType !== "shattering" || entry.forcedSold) return entry;
+      const runes = (entry.runes ?? []).filter((rune) => rune.id !== runeId);
+      return synchronizeShatteringSale(entry, runes);
+    }),
   );
 }
 

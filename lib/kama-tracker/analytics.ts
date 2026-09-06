@@ -14,15 +14,35 @@ export interface CommercialTotals {
   soldCount: number;
 }
 
+interface SaleRecord {
+  price: number;
+  soldAt: string;
+}
+
 const TIMELINE_DAYS: Record<Exclude<Timeline, "all">, number> = {
   "7d": 7,
   "30d": 30,
   "90d": 90,
 };
 
-/** Returns a sold entry's realized profit, or `null` while its sale is open. */
+/** Returns an entry's realized profit to date, or `null` while no sale is recorded. */
 export function getEntryProfit(entry: TradeEntry) {
   return entry.sellPrice === null ? null : entry.sellPrice - entry.entryCost;
+}
+
+/** Returns all recorded sale amounts and dates, including individually sold runes. */
+export function getEntrySaleRecords(entry: TradeEntry): SaleRecord[] {
+  if (entry.commercialType === "shattering" && !entry.forcedSold) {
+    return (entry.runes ?? []).flatMap((rune) =>
+      rune.status === "SOLD" && rune.sellPrice !== null && rune.soldAt
+        ? [{ price: rune.sellPrice, soldAt: rune.soldAt }]
+        : [],
+    );
+  }
+
+  return entry.sellPrice !== null && entry.soldAt
+    ? [{ price: entry.sellPrice, soldAt: entry.soldAt }]
+    : [];
 }
 
 /** Checks whether a non-null date falls within the requested reporting timeline. */
@@ -48,15 +68,15 @@ export function getCommercialTotals(
   const expenseEntries = entries.filter((entry) =>
     isInTimeline(entry.acquiredAt, timeline),
   );
-  const saleEntries = entries.filter((entry) =>
-    isInTimeline(entry.soldAt, timeline),
+  const saleRecords = entries.flatMap(getEntrySaleRecords).filter((sale) =>
+    isInTimeline(sale.soldAt, timeline),
   );
   const expenses = expenseEntries.reduce(
     (sum, entry) => sum + entry.entryCost,
     0,
   );
-  const sales = saleEntries.reduce(
-    (sum, entry) => sum + (entry.sellPrice ?? 0),
+  const sales = saleRecords.reduce(
+    (sum, sale) => sum + sale.price,
     0,
   );
 
@@ -65,7 +85,7 @@ export function getCommercialTotals(
     sales,
     profit: sales - expenses,
     entryCount: expenseEntries.length,
-    soldCount: saleEntries.length,
+    soldCount: saleRecords.length,
   };
 }
 
@@ -77,15 +97,15 @@ export function getTrackerTotals(
   const expenseEntries = state.entries.filter((entry) =>
     isInTimeline(entry.acquiredAt, timeline),
   );
-  const saleEntries = state.entries.filter((entry) =>
-    isInTimeline(entry.soldAt, timeline),
+  const saleRecords = state.entries.flatMap(getEntrySaleRecords).filter((sale) =>
+    isInTimeline(sale.soldAt, timeline),
   );
   const expenses = expenseEntries.reduce(
     (sum, entry) => sum + entry.entryCost,
     0,
   );
-  const sales = saleEntries.reduce(
-    (sum, entry) => sum + (entry.sellPrice ?? 0),
+  const sales = saleRecords.reduce(
+    (sum, sale) => sum + sale.price,
     0,
   );
 
@@ -93,7 +113,7 @@ export function getTrackerTotals(
     expenses,
     sales,
     profit: sales - expenses,
-    openCount: expenseEntries.filter((entry) => entry.status === "NOT_SOLD").length,
+    openCount: expenseEntries.filter((entry) => entry.status !== "SOLD").length,
   };
 }
 

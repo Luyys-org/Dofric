@@ -1,3 +1,7 @@
+.rune-manager { padding-left: 16px; padding-right: 16px; }
+@media (max-width: 640px) { .rune-add-form { grid-template-columns: 1fr 80px; }.rune-add-form .secondary-button { grid-column: 1 / -1; }.rune-list li { grid-template-columns: 1fr; gap: 8px; }.rune-sale { justify-content: end; }.rune-sale .numeric { margin-right: auto; text-align: left; } }
+.status.is-partial { color: #875e08; background: var(--kama-soft); }.status.is-partial::before { background: var(--kama); }
+.rune-manager { display: grid; gap: 14px; padding: 22px; }.rune-notice { margin: 0; padding: 10px; color: #875e08; background: var(--kama-soft); font-size: 12px; line-height: 1.45; }.rune-add-form { display: grid; grid-template-columns: minmax(0, 1fr) 80px auto; gap: 8px; }.rune-add-form .secondary-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }.rune-list { display: grid; gap: 0; margin: 0; padding: 0; border-top: 1px solid var(--line); list-style: none; }.rune-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--line); }.rune-detail { min-width: 0; }.rune-detail strong, .rune-detail small { display: block; }.rune-detail strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }.rune-detail small { margin-top: 3px; color: var(--muted); font-size: 11px; }.rune-sale { display: flex; align-items: center; gap: 5px; }.rune-sale .numeric { min-width: 74px; text-align: right; font-size: 12px; }.empty-runes { padding: 24px; color: var(--muted); border: 1px dashed var(--line); text-align: center; }.empty-runes p { margin: 0; font-size: 12px; }
 @import "tailwindcss";
 
 :root {
@@ -77,7 +81,7 @@ h3 { margin-bottom: 0; font-size: 14px; letter-spacing: 0; }
 .chart-key { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; font-weight: 700; }
 .chart-key i { display: block; width: 8px; height: 8px; background: var(--mint); }
 .chart-key.expense i { background: var(--coral); }
-.bar-chart { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; height: 218px; margin-top: 24px; }
+.bar-chart { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; height: 218px; margin-top: 24px; }
 .bar-group { display: grid; grid-template-rows: auto 1fr auto; min-width: 0; gap: 8px; text-align: center; }
 .bar-group strong { overflow: hidden; color: var(--ink); font-family: var(--font-geist-mono), monospace; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .bar-group > span { overflow: hidden; color: var(--muted); font-size: 11px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
@@ -86,7 +90,7 @@ h3 { margin-bottom: 0; font-size: 14px; letter-spacing: 0; }
 .bar.income { background: var(--mint); }
 .bar.expense { background: var(--coral); }
 .latest-section { margin-top: 14px; }
-.movement-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 22px; border-top: 1px solid var(--line); }
+.movement-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 22px; border-top: 1px solid var(--line); }
 .movement-column { min-width: 0; padding: 18px 20px 0 0; }
 .movement-column + .movement-column { padding-left: 20px; border-left: 1px solid var(--line); }
 .movement-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }

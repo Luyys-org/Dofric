@@ -4,9 +4,11 @@ import {
   Check,
   CirclePlus,
   LoaderCircle,
+  ListPlus,
   Pencil,
   Search,
   Trash2,
+  Undo2,
   Upload,
   X,
 } from "lucide-react";
@@ -20,6 +22,7 @@ import {
   COMMERCIAL_TYPE_DETAILS,
   type CommercialType,
   type SaleStatus,
+  type ShatteringRune,
   type TradeEntry,
 } from "@/types/kama-tracker";
 
@@ -204,6 +207,7 @@ function TradeForm({
 
 function SaleForm({ entry, onClose }: { entry: TradeEntry; onClose: () => void }) {
   const { completeSale } = useTracker();
+  const forcingShatteringSale = entry.commercialType === "shattering";
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -215,11 +219,15 @@ function SaleForm({ entry, onClose }: { entry: TradeEntry; onClose: () => void }
   }
 
   return (
-    <Dialog description={`Complete the sale for ${entry.itemName}.`} onClose={onClose} title="Record sale">
+    <Dialog
+      description={forcingShatteringSale ? `Record the total return for ${entry.itemName} and mark it sold, even if some runes remain open.` : `Complete the sale for ${entry.itemName}.`}
+      onClose={onClose}
+      title={forcingShatteringSale ? "Force complete entry" : "Record sale"}
+    >
       <form className="dialog-form" onSubmit={handleSubmit}>
         <div className="form-grid">
           <div className="form-field full">
-            <label htmlFor="sellPrice">Sell price</label>
+            <label htmlFor="sellPrice">{forcingShatteringSale ? "Total rune sales" : "Sell price"}</label>
             <input autoFocus className="field-control" id="sellPrice" min="0" name="sellPrice" required step="1" type="number" />
           </div>
           <div className="form-field full">
@@ -229,9 +237,83 @@ function SaleForm({ entry, onClose }: { entry: TradeEntry; onClose: () => void }
         </div>
         <div className="dialog-actions">
           <button className="secondary-button" onClick={onClose} type="button">Cancel</button>
-          <button className="primary-button" type="submit"><Check aria-hidden="true" size={16} />Complete sale</button>
+          <button className="primary-button" type="submit"><Check aria-hidden="true" size={16} />{forcingShatteringSale ? "Force complete" : "Complete sale"}</button>
         </div>
       </form>
+    </Dialog>
+  );
+}
+
+function RuneSaleForm({ entry, onClose, rune }: { entry: TradeEntry; onClose: () => void; rune: ShatteringRune }) {
+  const { completeRuneSale } = useTracker();
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const sellPrice = getNumber(formData, "sellPrice");
+    if (sellPrice < 0) return;
+    completeRuneSale(entry.id, rune.id, { sellPrice, soldAt: String(formData.get("soldAt")) });
+    onClose();
+  }
+
+  return (
+    <Dialog description={`Record the total sale for ${rune.quantity} ${rune.name}.`} onClose={onClose} title="Record rune sale">
+      <form className="dialog-form" onSubmit={handleSubmit}>
+        <div className="form-grid">
+          <div className="form-field full">
+            <label htmlFor="runeSellPrice">Sell price</label>
+            <input autoFocus className="field-control" id="runeSellPrice" min="0" name="sellPrice" required step="1" type="number" />
+          </div>
+          <div className="form-field full">
+            <label htmlFor="runeSoldAt">Sale date</label>
+            <input className="field-control" defaultValue={toDateInputValue()} id="runeSoldAt" name="soldAt" required type="date" />
+          </div>
+        </div>
+        <div className="dialog-actions">
+          <button className="secondary-button" onClick={onClose} type="button">Cancel</button>
+          <button className="primary-button" type="submit"><Check aria-hidden="true" size={16} />Record sale</button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
+function RuneManager({
+  entry,
+  onClose,
+  onRecordSale,
+}: {
+  entry: TradeEntry;
+  onClose: () => void;
+  onRecordSale: (rune: ShatteringRune) => void;
+}) {
+  const { addShatteringRune, deleteShatteringRune, reopenRuneSale } = useTracker();
+  const runes = entry.runes ?? [];
+  const isForced = Boolean(entry.forcedSold);
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const name = String(formData.get("name") ?? "").trim();
+    const quantity = getNumber(formData, "quantity");
+    if (!name || quantity <= 0) return;
+    addShatteringRune(entry.id, { name, quantity });
+    event.currentTarget.reset();
+  }
+
+  return (
+    <Dialog description={`Track every rune produced by ${entry.itemName}.`} onClose={onClose} title="Manage runes">
+      <div className="rune-manager">
+        {isForced && <p className="rune-notice">This entry was force-completed. Its recorded total remains final.</p>}
+        {!isForced && <form className="rune-add-form" onSubmit={handleSubmit}>
+          <label className="sr-only" htmlFor="runeName">Rune name</label>
+          <input className="field-control" id="runeName" name="name" placeholder="Rune name" required />
+          <label className="sr-only" htmlFor="runeQuantity">Quantity</label>
+          <input className="field-control" defaultValue="1" id="runeQuantity" min="1" name="quantity" required step="1" type="number" />
+          <button className="secondary-button" type="submit"><CirclePlus aria-hidden="true" size={16} />Add rune</button>
+        </form>}
+        {runes.length === 0 ? <div className="empty-runes"><p>No runes recorded yet.</p></div> : <ul className="rune-list">{runes.map((rune) => <li key={rune.id}><div className="rune-detail"><strong>{rune.name}</strong><small>Quantity: {rune.quantity}{rune.soldAt && ` · Sold ${formatDate(rune.soldAt)}`}</small></div><div className="rune-sale"><span className="numeric">{rune.sellPrice === null ? "-" : formatKamas(rune.sellPrice)}</span><span className={rune.status === "SOLD" ? "status is-sold" : "status is-open"}>{rune.status === "SOLD" ? "SOLD" : "NOT SOLD"}</span>{!isForced && (rune.status === "SOLD" ? <button className="icon-button" onClick={() => reopenRuneSale(entry.id, rune.id)} title="Reopen rune sale" type="button"><Undo2 aria-hidden="true" size={16} /></button> : <button className="icon-button" onClick={() => onRecordSale(rune)} title="Record rune sale" type="button"><Check aria-hidden="true" size={17} /></button>)}{!isForced && <button className="icon-button" onClick={() => deleteShatteringRune(entry.id, rune.id)} title="Delete rune" type="button"><Trash2 aria-hidden="true" size={16} /></button>}</div></li>)}</ul>}
+      </div>
     </Dialog>
   );
 }
@@ -259,7 +341,10 @@ export function Ledger({ commercialType }: { commercialType: CommercialType }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<TradeEntry | null>(null);
   const [selling, setSelling] = useState<TradeEntry | null>(null);
+  const [managingRuneEntryId, setManagingRuneEntryId] = useState<string | null>(null);
+  const [sellingRune, setSellingRune] = useState<{ entry: TradeEntry; rune: ShatteringRune } | null>(null);
   const details = COMMERCIAL_TYPE_DETAILS[commercialType];
+  const managedRuneEntry = state.entries.find((entry) => entry.id === managingRuneEntryId) ?? null;
   const normalizedQuery = query.trim().toLocaleLowerCase();
   const entries = sortEntries(
     state.entries.filter((entry) => entry.commercialType === commercialType && (status === "all" || entry.status === status) && entry.itemName.toLocaleLowerCase().includes(normalizedQuery)),
@@ -275,17 +360,19 @@ export function Ledger({ commercialType }: { commercialType: CommercialType }) {
       <div className="ledger-toolbar">
         <div className="filter-group">
           <label className="search-field" style={{ display: "block", position: "relative" }}><Search aria-hidden="true" size={16} style={{ color: "var(--muted)", left: 11, pointerEvents: "none", position: "absolute", top: "50%", transform: "translateY(-50%)", zIndex: 1 }} /><span className="sr-only">Search entries</span><input className="field-control search-control" onChange={(event) => setQuery(event.target.value)} placeholder="Search item" style={{ paddingLeft: 35 }} type="search" value={query} /></label>
-          <select aria-label="Filter by sale status" className="field-control" onChange={(event) => setStatus(event.target.value as "all" | SaleStatus)} value={status}><option value="all">All statuses</option><option value="NOT_SOLD">Not sold</option><option value="SOLD">Sold</option></select>
+          <select aria-label="Filter by sale status" className="field-control" onChange={(event) => setStatus(event.target.value as "all" | SaleStatus)} value={status}><option value="all">All statuses</option><option value="NOT_SOLD">Not sold</option><option value="PARTIALLY_SOLD">Partially sold</option><option value="SOLD">Sold</option></select>
           <select aria-label="Sort entries" className="field-control" onChange={(event) => setSort(event.target.value as SortKey)} value={sort}>{sortOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
         </div>
         <span className="result-count">{entries.length} {entries.length === 1 ? "entry" : "entries"}</span>
       </div>
       <div className="ledger-table-wrap">
-        {entries.length === 0 ? <div className="empty-table"><CirclePlus aria-hidden="true" size={28} /><p>No matching entries in this ledger.</p><button className="primary-button" onClick={() => setCreateOpen(true)} type="button">Add first entry</button></div> : <table className="ledger-table"><thead><tr><th>Item</th><th>Entry date</th><th>Qty.</th><th>Cost</th><th>Sale</th><th>Profit</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{entries.map((entry) => { const profit = getEntryProfit(entry); return <tr key={entry.id}><td className="item-cell"><strong>{entry.itemName}</strong>{entry.notes && <small>{entry.notes}</small>}</td><td>{formatDate(entry.acquiredAt)}</td><td>{entry.quantity}</td><td className="numeric">{formatKamas(entry.entryCost)}</td><td className="numeric">{entry.sellPrice === null ? "-" : formatKamas(entry.sellPrice)}</td><td className={profit === null ? "numeric" : profit >= 0 ? "profit positive" : "profit negative"}>{profit === null ? "-" : `${profit >= 0 ? "+" : "-"}${formatKamas(Math.abs(profit))}`}</td><td><span className={entry.status === "SOLD" ? "status is-sold" : "status is-open"}>{entry.status === "SOLD" ? "SOLD" : "NOT SOLD"}</span></td><td><div className="row-actions">{entry.status === "NOT_SOLD" && <button className="icon-button" onClick={() => setSelling(entry)} title="Record sale" type="button"><Check aria-hidden="true" size={17} /></button>}<button className="icon-button" onClick={() => setEditing(entry)} title="Edit entry" type="button"><Pencil aria-hidden="true" size={16} /></button><button className="icon-button" onClick={() => deleteTrade(entry.id)} title="Delete entry" type="button"><Trash2 aria-hidden="true" size={16} /></button></div></td></tr>; })}</tbody></table>}
+        {entries.length === 0 ? <div className="empty-table"><CirclePlus aria-hidden="true" size={28} /><p>No matching entries in this ledger.</p><button className="primary-button" onClick={() => setCreateOpen(true)} type="button">Add first entry</button></div> : <table className="ledger-table"><thead><tr><th>Item</th><th>Entry date</th><th>Qty.</th><th>Cost</th><th>Sale</th><th>Profit</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{entries.map((entry) => { const profit = getEntryProfit(entry); const isShatteringEntry = entry.commercialType === "shattering"; const isOpen = entry.status !== "SOLD"; const statusLabel = entry.status === "PARTIALLY_SOLD" ? "PARTIALLY SOLD" : entry.status === "SOLD" ? "SOLD" : "NOT SOLD"; return <tr key={entry.id}><td className="item-cell"><strong>{entry.itemName}</strong>{entry.notes && <small>{entry.notes}</small>}</td><td>{formatDate(entry.acquiredAt)}</td><td>{entry.quantity}</td><td className="numeric">{formatKamas(entry.entryCost)}</td><td className="numeric">{entry.sellPrice === null ? "-" : formatKamas(entry.sellPrice)}</td><td className={profit === null ? "numeric" : profit >= 0 ? "profit positive" : "profit negative"}>{profit === null ? "-" : `${profit >= 0 ? "+" : "-"}${formatKamas(Math.abs(profit))}`}</td><td><span className={entry.status === "SOLD" ? "status is-sold" : entry.status === "PARTIALLY_SOLD" ? "status is-partial" : "status is-open"}>{statusLabel}</span></td><td><div className="row-actions">{isShatteringEntry && <button className="icon-button" onClick={() => setManagingRuneEntryId(entry.id)} title="Manage runes" type="button"><ListPlus aria-hidden="true" size={17} /></button>}{isOpen && <button className="icon-button" onClick={() => setSelling(entry)} title={isShatteringEntry ? "Force complete entry" : "Record sale"} type="button"><Check aria-hidden="true" size={17} /></button>}<button className="icon-button" onClick={() => setEditing(entry)} title="Edit entry" type="button"><Pencil aria-hidden="true" size={16} /></button><button className="icon-button" onClick={() => deleteTrade(entry.id)} title="Delete entry" type="button"><Trash2 aria-hidden="true" size={16} /></button></div></td></tr>; })}</tbody></table>}
       </div>
       {createOpen && <TradeForm commercialType={commercialType} onClose={() => setCreateOpen(false)} />}
       {editing && <TradeForm commercialType={commercialType} entry={editing} onClose={() => setEditing(null)} />}
       {selling && <SaleForm entry={selling} onClose={() => setSelling(null)} />}
+      {managedRuneEntry && <RuneManager entry={managedRuneEntry} onClose={() => setManagingRuneEntryId(null)} onRecordSale={(rune) => { setManagingRuneEntryId(null); setSellingRune({ entry: managedRuneEntry, rune }); }} />}
+      {sellingRune && <RuneSaleForm entry={sellingRune.entry} onClose={() => setSellingRune(null)} rune={sellingRune.rune} />}
     </div>
   );
 }

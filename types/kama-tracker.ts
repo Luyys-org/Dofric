@@ -1,8 +1,10 @@
-export const COMMERCIAL_TYPES = ["buy-resell", "crafting", "magus"] as const;
+export const COMMERCIAL_TYPES = ["buy-resell", "crafting", "shattering", "magus"] as const;
 
 export type CommercialType = (typeof COMMERCIAL_TYPES)[number];
 
-export type SaleStatus = "NOT_SOLD" | "SOLD";
+export type SaleStatus = "NOT_SOLD" | "PARTIALLY_SOLD" | "SOLD";
+
+export type RuneSaleStatus = Exclude<SaleStatus, "PARTIALLY_SOLD">;
 
 export interface CommercialTypeDetails {
   label: string;
@@ -21,6 +23,10 @@ export const COMMERCIAL_TYPE_DETAILS: Record<
     label: "Crafting",
     description: "Turn raw materials into a finished item.",
   },
+  shattering: {
+    label: "Shattering",
+    description: "Shatter equipment into runes for resale.",
+  },
   magus: {
     label: "Magus",
     description: "Sell enchanted or improved equipment.",
@@ -37,9 +43,20 @@ export interface TradeEntry {
   status: SaleStatus;
   sellPrice: number | null;
   soldAt: string | null;
+  runes?: ShatteringRune[];
+  forcedSold?: boolean;
   notes: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ShatteringRune {
+  id: string;
+  name: string;
+  quantity: number;
+  status: RuneSaleStatus;
+  sellPrice: number | null;
+  soldAt: string | null;
 }
 
 export interface KamaTrackerState {
@@ -56,6 +73,16 @@ export interface CreateTradeInput {
 }
 
 export interface CompleteSaleInput {
+  sellPrice: number;
+  soldAt?: string;
+}
+
+export interface AddShatteringRuneInput {
+  name: string;
+  quantity?: number;
+}
+
+export interface CompleteRuneSaleInput {
   sellPrice: number;
   soldAt?: string;
 }

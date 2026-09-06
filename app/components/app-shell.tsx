@@ -15,6 +15,7 @@ const navigation = [
   { href: "/", label: "Overview", icon: House },
   { href: "/ledger/buy-resell", label: "Buy / Resell", icon: RefreshCw },
   { href: "/ledger/crafting", label: "Crafting", icon: Hammer },
+  { href: "/ledger/shattering", label: "Shattering", icon: Hammer },
   { href: "/ledger/magus", label: "Magus", icon: ShoppingBag },
 ] as const;
 
