@@ -10,7 +10,8 @@ The application is deliberately browser-local: it does not require an account, A
 - Sales and expense bar charts by commercial type for 7, 30, or 90 days, or all time.
 - Latest movement lists for Buy / Resell, Crafting, Shattering, and Magus activities.
 - Separate CRUD ledgers for each commercial type.
-- Item-name suggestions sourced from the included Dofus item extract.
+- Persistent English/French interface switch with locale-aware dates and number formatting.
+- English and French item-name suggestions sourced from the included Dofus item extract.
 - Item search, status filtering, and sorting by date, item name, costs, sales, profit, or status.
 - Two-stage selling workflow: record the item and entry cost first, then complete the sale whenever it occurs.
 - Shattering rune management with individual rune sales and automatic partial-sale tracking.
@@ -46,6 +47,8 @@ npm run dev
 ```
 
 Open the local URL printed by Next.js, normally `http://localhost:3000`. Next.js chooses another available port when that port is already in use.
+
+Use the language selector in the sidebar to switch the interface between English and French. The selection is saved in the current browser and applies to navigation, dashboards, ledgers, dialogs, status labels, dates, number formatting, and Dofus item suggestions.
 
 ## Commands
 
@@ -119,8 +122,10 @@ The OCR worker, WebAssembly core, and English language data are served from `pub
 | `app/` | Next.js App Router pages, application shell, styling, and feature-local dashboard and ledger UI. |
 | `app/ledger/[commercialType]/` | Static routes for the four supported commercial ledgers. |
 | `lib/storage/` | SSR-safe typed browser storage built on `useSyncExternalStore`. |
+| `lib/i18n.ts` | Predefined English/French text and the `translationPipe()` lookup function. |
+| `app/components/language-provider.tsx` | Persisted language context that exposes the translation pipe as `t()`. |
 | `lib/kama-tracker/` | Tracker persistence facade, React hook, analytics, formatting, OCR parsing, and route resolution. |
-| `scripts/generate-item-index.mjs` | Produces the compact English item-name catalog used by entry-form suggestions. |
+| `scripts/generate-item-index.mjs` | Produces the compact bilingual item-name catalog used by entry-form suggestions. |
 | `types/kama-tracker.ts` | Shared commercial, sale, and trade-record contracts. |
 | `public/tesseract/` | Locally served Tesseract worker, WebAssembly core, and English language model. |
 

@@ -11,32 +11,35 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { useLanguage } from "./language-provider";
+
 const navigation = [
-  { href: "/", label: "Overview", icon: House },
-  { href: "/ledger/buy-resell", label: "Buy / Resell", icon: RefreshCw },
-  { href: "/ledger/crafting", label: "Crafting", icon: Hammer },
-  { href: "/ledger/shattering", label: "Shattering", icon: Hammer },
-  { href: "/ledger/magus", label: "Magus", icon: ShoppingBag },
+  { href: "/", label: "nav.overview", icon: House },
+  { href: "/ledger/buy-resell", label: "nav.buyResell", icon: RefreshCw },
+  { href: "/ledger/crafting", label: "nav.crafting", icon: Hammer },
+  { href: "/ledger/shattering", label: "nav.shattering", icon: Hammer },
+  { href: "/ledger/magus", label: "nav.magus", icon: ShoppingBag },
 ] as const;
 
 /** Renders the persistent navigation shell around each application route. */
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const { language, setLanguage, t } = useLanguage();
 
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <Link className="brand" href="/" aria-label="Dofric overview">
+        <Link className="brand" href="/" aria-label={t("nav.overviewAria")}>
           <span className="brand-mark" aria-hidden="true">
             K
           </span>
           <span>
             <strong>Dofric</strong>
-            <small>Kama ledger</small>
+            <small>{t("app.kamaLedger")}</small>
           </span>
         </Link>
-        <nav className="main-nav" aria-label="Main navigation">
-          <p>Ledger</p>
+        <nav className="main-nav" aria-label={t("nav.ledger")}>
+          <p>{t("nav.ledger")}</p>
           {navigation.map(({ href, label, icon: Icon }) => {
             const active = href === "/" ? pathname === href : pathname.startsWith(href);
             return (
@@ -46,14 +49,21 @@ export function AppShell({ children }: { children: ReactNode }) {
                 key={href}
               >
                 <Icon aria-hidden="true" size={18} strokeWidth={2.2} />
-                <span>{label}</span>
+                <span>{t(label)}</span>
               </Link>
             );
           })}
         </nav>
+        <label className="language-switcher">
+          <span>{t("language.choose")}</span>
+          <select onChange={(event) => setLanguage(event.target.value as "en" | "fr")} value={language}>
+            <option value="en">{t("language.english")}</option>
+            <option value="fr">{t("language.french")}</option>
+          </select>
+        </label>
         <div className="sidebar-note">
           <ChartNoAxesCombined aria-hidden="true" size={18} />
-          <p>Your figures stay in this browser.</p>
+          <p>{t("nav.privacy")}</p>
         </div>
       </aside>
       <main className="app-content">{children}</main>
