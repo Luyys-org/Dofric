@@ -16,7 +16,7 @@ const navigation = [
   { href: "/ledger/buy-resell", label: "Buy / Resell", icon: RefreshCw },
   { href: "/ledger/crafting", label: "Crafting", icon: Hammer },
   { href: "/ledger/magus", label: "Magus", icon: ShoppingBag },
-];
+] as const;
 
 /** Renders the persistent navigation shell around each application route. */
 export function AppShell({ children }: { children: ReactNode }) {
