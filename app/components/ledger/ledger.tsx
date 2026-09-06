@@ -12,7 +12,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 
 import { getEntryProfit } from "@/lib/kama-tracker/analytics";
 import { formatDate, formatKamas, toDateInputValue } from "@/lib/kama-tracker/formatters";
@@ -39,6 +39,37 @@ const sortOptions: { value: SortKey; label: string }[] = [
 ];
 
 const tesseractAssetPath = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/tesseract`;
+const itemCatalogPath = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/items.en.json`;
+
+interface DofusItemOption {
+  id: number;
+  name: string;
+}
+
+let itemCatalogPromise: Promise<DofusItemOption[]> | null = null;
+
+function loadItemCatalog() {
+  itemCatalogPromise ??= fetch(itemCatalogPath)
+    .then(async (response) => {
+      if (!response.ok) throw new Error("Unable to load the item catalog.");
+      const catalog: unknown = await response.json();
+      if (!Array.isArray(catalog)) throw new Error("Invalid item catalog.");
+      return catalog.flatMap((item): DofusItemOption[] => {
+        if (
+          typeof item !== "object" ||
+          item === null ||
+          typeof (item as { id?: unknown }).id !== "number" ||
+          typeof (item as { name?: unknown }).name !== "string"
+        ) return [];
+        return [item as DofusItemOption];
+      });
+    })
+    .catch((error: unknown) => {
+      itemCatalogPromise = null;
+      throw error;
+    });
+  return itemCatalogPromise;
+}
 
 function getNumber(formData: FormData, field: string) {
   return Number(formData.get(field));
@@ -94,10 +125,37 @@ function TradeForm({
 }) {
   const { addTrade, updateTrade } = useTracker();
   const editing = Boolean(entry);
+  const [itemName, setItemName] = useState(entry?.itemName ?? "");
+  const [itemCatalog, setItemCatalog] = useState<DofusItemOption[]>([]);
+  const [itemCatalogState, setItemCatalogState] = useState<"loading" | "ready" | "error">("loading");
+  const [itemPickerOpen, setItemPickerOpen] = useState(false);
   const [entryCost, setEntryCost] = useState(entry?.entryCost.toString() ?? "");
   const [ocrValues, setOcrValues] = useState<number[]>([]);
   const [selectedOcrValues, setSelectedOcrValues] = useState<boolean[]>([]);
   const [ocrState, setOcrState] = useState<"idle" | "loading" | "error">("idle");
+
+  useEffect(() => {
+    let active = true;
+    loadItemCatalog()
+      .then((catalog) => {
+        if (!active) return;
+        setItemCatalog(catalog);
+        setItemCatalogState("ready");
+      })
+      .catch(() => {
+        if (active) setItemCatalogState("error");
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const normalizedItemName = itemName.trim().toLocaleLowerCase();
+  const itemSuggestions = normalizedItemName
+    ? itemCatalog
+        .filter((item) => item.name.toLocaleLowerCase().includes(normalizedItemName))
+        .slice(0, 50)
+    : [];
 
   async function scanScreenshot(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -139,14 +197,14 @@ function TradeForm({
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
-    const itemName = String(formData.get("itemName") ?? "").trim();
+    const name = String(formData.get("itemName") ?? "").trim();
     const cost = getNumber(formData, "entryCost");
     const quantity = getNumber(formData, "quantity");
 
-    if (!itemName || cost < 0 || quantity <= 0) return;
+    if (!name || cost < 0 || quantity <= 0) return;
 
     const input = {
-      itemName,
+      itemName: name,
       entryCost: cost,
       quantity,
       acquiredAt: String(formData.get("acquiredAt")),
@@ -167,7 +225,11 @@ function TradeForm({
         <div className="form-grid">
           <div className="form-field full">
             <label htmlFor="itemName">Item name</label>
-            <input className="field-control" defaultValue={entry?.itemName} id="itemName" name="itemName" placeholder="e.g. Gelano" required />
+            <div className="item-picker">
+              <input aria-autocomplete="list" aria-controls="dofus-item-options" aria-expanded={itemPickerOpen && itemSuggestions.length > 0} autoComplete="off" className="field-control" disabled={itemCatalogState === "loading"} id="itemName" name="itemName" onBlur={() => setItemPickerOpen(false)} onChange={(event) => { setItemName(event.target.value); setItemPickerOpen(true); }} onFocus={() => setItemPickerOpen(true)} onKeyDown={(event) => { if (event.key === "Escape") setItemPickerOpen(false); }} placeholder={itemCatalogState === "loading" ? "Loading Dofus items..." : "Search Dofus items"} required role="combobox" value={itemName} />
+              {itemPickerOpen && itemSuggestions.length > 0 && <ul className="item-suggestions" id="dofus-item-options" role="listbox">{itemSuggestions.map((item) => <li key={item.id}><button onMouseDown={(event) => event.preventDefault()} onClick={() => { setItemName(item.name); setItemPickerOpen(false); }} role="option" type="button">{item.name}</button></li>)}</ul>}
+            </div>
+            {itemCatalogState === "error" && <p className="item-catalog-error" role="alert">Dofus items could not be loaded. Enter an item name manually.</p>}
           </div>
           <div className="form-field">
             <label htmlFor="entryCost">Entry cost</label>

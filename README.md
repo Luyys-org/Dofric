@@ -10,6 +10,7 @@ The application is deliberately browser-local: it does not require an account, A
 - Sales and expense bar charts by commercial type for 7, 30, or 90 days, or all time.
 - Latest movement lists for Buy / Resell, Crafting, Shattering, and Magus activities.
 - Separate CRUD ledgers for each commercial type.
+- Item-name suggestions sourced from the included Dofus item extract.
 - Item search, status filtering, and sorting by date, item name, costs, sales, profit, or status.
 - Two-stage selling workflow: record the item and entry cost first, then complete the sale whenever it occurs.
 - Shattering rune management with individual rune sales and automatic partial-sale tracking.
@@ -61,8 +62,9 @@ Open the local URL printed by Next.js, normally `http://localhost:3000`. Next.js
 
 1. Open the appropriate commercial ledger.
 2. Select **New entry**.
-3. Enter the item name, total entry cost, quantity, entry date, and optional notes.
-4. Save the entry. Its status is `NOT SOLD` until a sale is recorded. Shattering entries remain open until their rune sales are recorded.
+3. Start typing an item name and choose a matching Dofus item from the dropdown, or enter a custom name.
+4. Enter the total entry cost, quantity, entry date, and optional notes.
+5. Save the entry. Its status is `NOT SOLD` until a sale is recorded. Shattering entries remain open until their rune sales are recorded.
 
 ### Record shattering rune sales
 
@@ -118,6 +120,7 @@ The OCR worker, WebAssembly core, and English language data are served from `pub
 | `app/ledger/[commercialType]/` | Static routes for the four supported commercial ledgers. |
 | `lib/storage/` | SSR-safe typed browser storage built on `useSyncExternalStore`. |
 | `lib/kama-tracker/` | Tracker persistence facade, React hook, analytics, formatting, OCR parsing, and route resolution. |
+| `scripts/generate-item-index.mjs` | Produces the compact English item-name catalog used by entry-form suggestions. |
 | `types/kama-tracker.ts` | Shared commercial, sale, and trade-record contracts. |
 | `public/tesseract/` | Locally served Tesseract worker, WebAssembly core, and English language model. |
 
