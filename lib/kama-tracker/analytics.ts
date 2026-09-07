@@ -30,12 +30,20 @@ export function getEntryProfit(entry: TradeEntry) {
   return entry.sellPrice === null ? null : entry.sellPrice - entry.entryCost;
 }
 
-/** Returns all recorded sale amounts and dates, including individually sold runes. */
+/** Returns all recorded sale amounts and dates, including individually sold runes and souls. */
 export function getEntrySaleRecords(entry: TradeEntry): SaleRecord[] {
   if (entry.commercialType === "shattering" && !entry.forcedSold) {
     return (entry.runes ?? []).flatMap((rune) =>
       rune.status === "SOLD" && rune.sellPrice !== null && rune.soldAt
         ? [{ price: rune.sellPrice, soldAt: rune.soldAt }]
+        : [],
+    );
+  }
+
+  if (entry.commercialType === "archimonster-sell") {
+    return (entry.archimonsterSouls ?? []).flatMap((soul) =>
+      soul.status === "SOLD" && soul.sellPrice !== null && soul.soldAt
+        ? [{ price: soul.sellPrice, soldAt: soul.soldAt }]
         : [],
     );
   }

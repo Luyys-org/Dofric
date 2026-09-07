@@ -1,6 +1,9 @@
 import { createBrowserStorage } from "@/lib/storage";
 import type {
+  AddArchimonsterSoulInput,
   AddShatteringRuneInput,
+  ArchimonsterSoul,
+  CompleteArchimonsterSoulSaleInput,
   CompleteRuneSaleInput,
   CompleteSaleInput,
   CreateTradeInput,
@@ -60,6 +63,27 @@ function synchronizeShatteringSale(entry: TradeEntry, runes: ShatteringRune[]): 
     sellPrice: soldRunes.length > 0 ? soldRunes.reduce((sum, rune) => sum + (rune.sellPrice ?? 0), 0) : null,
     soldAt: soldRunes.reduce<string | null>(
       (latest, rune) => (!latest || (rune.soldAt && rune.soldAt > latest) ? rune.soldAt : latest),
+      null,
+    ),
+    updatedAt: now(),
+  };
+}
+
+function getArchimonsterSaleStatus(souls: ArchimonsterSoul[]): SaleStatus {
+  if (souls.length === 0) return "NOT_SOLD";
+  if (souls.every((soul) => soul.status === "SOLD")) return "SOLD";
+  return souls.some((soul) => soul.status === "SOLD") ? "PARTIALLY_SOLD" : "NOT_SOLD";
+}
+
+function synchronizeArchimonsterSale(entry: TradeEntry, souls: ArchimonsterSoul[]): TradeEntry {
+  const soldSouls = souls.filter((soul) => soul.status === "SOLD");
+  return {
+    ...entry,
+    archimonsterSouls: souls,
+    status: getArchimonsterSaleStatus(souls),
+    sellPrice: soldSouls.length > 0 ? soldSouls.reduce((sum, soul) => sum + (soul.sellPrice ?? 0), 0) : null,
+    soldAt: soldSouls.reduce<string | null>(
+      (latest, soul) => (!latest || (soul.soldAt && soul.soldAt > latest) ? soul.soldAt : latest),
       null,
     ),
     updatedAt: now(),
@@ -192,4 +216,73 @@ export function deleteTrade(entryId: string) {
     ...state,
     entries: state.entries.filter((entry) => entry.id !== entryId),
   }));
+}
+
+/** Adds an Archmonster soul found during a farming session. */
+export function addArchimonsterSoul(entryId: string, input: AddArchimonsterSoulInput) {
+  const name = input.name.trim();
+  const quantity = input.quantity ?? 1;
+  if (!name || quantity <= 0) return;
+
+  trackerStorage.set((state) =>
+    updateEntry(state, entryId, (entry) => {
+      if (entry.commercialType !== "archimonster-sell") return entry;
+      const soul: ArchimonsterSoul = {
+        id: createId(),
+        name,
+        quantity,
+        status: "NOT_SOLD",
+        sellPrice: null,
+        soldAt: null,
+      };
+      return synchronizeArchimonsterSale(entry, [...(entry.archimonsterSouls ?? []), soul]);
+    }),
+  );
+}
+
+/** Records the sale of an Archmonster soul from a farming session. */
+export function completeArchimonsterSoulSale(
+  entryId: string,
+  soulId: string,
+  input: CompleteArchimonsterSoulSaleInput,
+) {
+  trackerStorage.set((state) =>
+    updateEntry(state, entryId, (entry) => {
+      if (entry.commercialType !== "archimonster-sell") return entry;
+      const souls = (entry.archimonsterSouls ?? []).map((soul) =>
+        soul.id === soulId
+          ? { ...soul, status: "SOLD" as const, sellPrice: input.sellPrice, soldAt: input.soldAt ?? today() }
+          : soul,
+      );
+      return synchronizeArchimonsterSale(entry, souls);
+    }),
+  );
+}
+
+/** Reopens an Archmonster soul sale so it no longer contributes to the session total. */
+export function reopenArchimonsterSoulSale(entryId: string, soulId: string) {
+  trackerStorage.set((state) =>
+    updateEntry(state, entryId, (entry) => {
+      if (entry.commercialType !== "archimonster-sell") return entry;
+      const souls = (entry.archimonsterSouls ?? []).map((soul) =>
+        soul.id === soulId
+          ? { ...soul, status: "NOT_SOLD" as const, sellPrice: null, soldAt: null }
+          : soul,
+      );
+      return synchronizeArchimonsterSale(entry, souls);
+    }),
+  );
+}
+
+/** Removes an Archmonster soul from a farming session. */
+export function deleteArchimonsterSoul(entryId: string, soulId: string) {
+  trackerStorage.set((state) =>
+    updateEntry(state, entryId, (entry) => {
+      if (entry.commercialType !== "archimonster-sell") return entry;
+      return synchronizeArchimonsterSale(
+        entry,
+        (entry.archimonsterSouls ?? []).filter((soul) => soul.id !== soulId),
+      );
+    }),
+  );
 }

@@ -18,6 +18,7 @@ const navigation = [
   { href: "/ledger/buy-resell", label: "nav.buyResell", icon: RefreshCw },
   { href: "/ledger/crafting", label: "nav.crafting", icon: Hammer },
   { href: "/ledger/shattering", label: "nav.shattering", icon: Hammer },
+  { href: "/ledger/archimonster-sell", label: "nav.archimonsterSell", icon: ShoppingBag },
   { href: "/ledger/magus", label: "nav.magus", icon: ShoppingBag },
 ] as const;
 

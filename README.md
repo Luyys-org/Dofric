@@ -8,13 +8,14 @@ The application is deliberately browser-local: it does not require an account, A
 
 - Dashboard with total sales, expenses, realized balance, and open listings.
 - Sales and expense bar charts by commercial type for 7, 30, or 90 days, or all time.
-- Latest movement lists for Buy / Resell, Crafting, Shattering, and Magus activities.
+- Latest movement lists for Buy / Resell, Crafting, Shattering, Archimonster sell, and Magus activities.
 - Separate CRUD ledgers for each commercial type.
 - Persistent English/French interface switch with locale-aware dates and number formatting.
 - English and French item-name suggestions sourced from the included Dofus item extract.
 - Item search, status filtering, and sorting by date, item name, costs, sales, profit, or status.
 - Two-stage selling workflow: record the item and entry cost first, then complete the sale whenever it occurs.
 - Shattering rune management with individual rune sales and automatic partial-sale tracking.
+- Archimonster farming sessions with filtered soul suggestions and individual soul-sale tracking.
 - Optional local screenshot OCR for pricing logs, with selectable detected values and automatic total calculation.
 - Responsive navigation, data tables, and dialogs for desktop and small screens.
 
@@ -25,6 +26,7 @@ The application is deliberately browser-local: it does not require an account, A
 | Buy / Resell | Buy an item, then resell it for a higher price. |
 | Crafting | Buy raw materials and sell the resulting crafted item. |
 | Shattering | Shatter equipment into runes for resale. |
+| Archimonster sell | Track soul stone and fairy costs, then sell the captured Archmonster souls. |
 | Magus | Sell enchanted or improved equipment. |
 
 ## Requirements
@@ -77,6 +79,13 @@ Use the language selector in the sidebar to switch the interface between English
 4. The entry becomes `PARTIALLY SOLD` after its first rune sale and `SOLD` when every recorded rune is sold.
 5. Select the entry check action to force completion, recording one final total when individual rune tracking is not needed.
 
+### Record Archimonster soul sales
+
+1. In the Archimonster sell ledger, create a farming session with the total cost of soul stones and Archimonster-seeking fairies.
+2. Select the soul-management action and add every captured soul from the filtered Archmonster soul list.
+3. Select the check action for a soul once it sells, then enter its total price and sale date.
+4. The session becomes `PARTIALLY SOLD` after its first soul sale and `SOLD` when every recorded soul is sold.
+
 ### Record a sale
 
 1. Find an open entry in its ledger.
@@ -102,6 +111,7 @@ OCR runs in the browser with Tesseract. It recognizes the price pattern used in 
 | `/ledger/buy-resell` | Buy / Resell ledger |
 | `/ledger/crafting` | Crafting ledger |
 | `/ledger/shattering` | Shattering ledger |
+| `/ledger/archimonster-sell` | Archimonster sell ledger |
 | `/ledger/magus` | Magus ledger |
 
 ## Data And Privacy
@@ -120,12 +130,12 @@ The OCR worker, WebAssembly core, and English language data are served from `pub
 | Area | Responsibility |
 | --- | --- |
 | `app/` | Next.js App Router pages, application shell, styling, and feature-local dashboard and ledger UI. |
-| `app/ledger/[commercialType]/` | Static routes for the four supported commercial ledgers. |
+| `app/ledger/[commercialType]/` | Static routes for the supported commercial ledgers. |
 | `lib/storage/` | SSR-safe typed browser storage built on `useSyncExternalStore`. |
 | `lib/i18n.ts` | Predefined English/French text and the `translationPipe()` lookup function. |
 | `app/components/language-provider.tsx` | Persisted language context that exposes the translation pipe as `t()`. |
 | `lib/kama-tracker/` | Tracker persistence facade, React hook, analytics, formatting, OCR parsing, and route resolution. |
-| `scripts/generate-item-index.mjs` | Produces the compact bilingual item-name catalog used by entry-form suggestions. |
+| `scripts/generate-item-index.mjs` | Produces compact bilingual item and filtered Archmonster soul catalogs used by form suggestions. |
 | `types/kama-tracker.ts` | Shared commercial, sale, and trade-record contracts. |
 | `public/tesseract/` | Locally served Tesseract worker, WebAssembly core, and English language model. |
 
@@ -136,6 +146,7 @@ Feature components do not import each other. Shared behavior is exposed through 
 - Expenses are counted on an entry's acquisition date.
 - Sales are counted on an entry's sale date.
 - Shattering sales are counted on each individual rune's sale date; force-completed Shattering entries use their recorded total and completion date.
+- Archimonster sales are counted on each individual soul's sale date.
 - An open or partially sold entry contributes to expenses and open listings. A Shattering entry's recorded rune sales contribute to sales and realized profit immediately.
 - Dashboard timeline controls change only the displayed calculations. They never remove stored records.
 

@@ -1,4 +1,4 @@
-export const COMMERCIAL_TYPES = ["buy-resell", "crafting", "shattering", "magus"] as const;
+export const COMMERCIAL_TYPES = ["buy-resell", "crafting", "shattering", "archimonster-sell", "magus"] as const;
 
 export type CommercialType = (typeof COMMERCIAL_TYPES)[number];
 
@@ -27,6 +27,10 @@ export const COMMERCIAL_TYPE_DETAILS: Record<
     label: "Shattering",
     description: "Shatter equipment into runes for resale.",
   },
+  "archimonster-sell": {
+    label: "Archmonster sell",
+    description: "Track farming costs and sell Archmonster souls.",
+  },
   magus: {
     label: "Magus",
     description: "Sell enchanted or improved equipment.",
@@ -44,6 +48,7 @@ export interface TradeEntry {
   sellPrice: number | null;
   soldAt: string | null;
   runes?: ShatteringRune[];
+  archimonsterSouls?: ArchimonsterSoul[];
   forcedSold?: boolean;
   notes: string;
   createdAt: string;
@@ -51,6 +56,15 @@ export interface TradeEntry {
 }
 
 export interface ShatteringRune {
+  id: string;
+  name: string;
+  quantity: number;
+  status: RuneSaleStatus;
+  sellPrice: number | null;
+  soldAt: string | null;
+}
+
+export interface ArchimonsterSoul {
   id: string;
   name: string;
   quantity: number;
@@ -83,6 +97,16 @@ export interface AddShatteringRuneInput {
 }
 
 export interface CompleteRuneSaleInput {
+  sellPrice: number;
+  soldAt?: string;
+}
+
+export interface AddArchimonsterSoulInput {
+  name: string;
+  quantity?: number;
+}
+
+export interface CompleteArchimonsterSoulSaleInput {
   sellPrice: number;
   soldAt?: string;
 }

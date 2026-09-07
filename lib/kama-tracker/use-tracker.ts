@@ -3,12 +3,16 @@
 import { useBrowserStorage } from "@/lib/storage";
 
 import {
+  addArchimonsterSoul,
   addTrade,
   addShatteringRune,
+  completeArchimonsterSoulSale,
   completeSale,
   completeRuneSale,
+  deleteArchimonsterSoul,
   deleteTrade,
   deleteShatteringRune,
+  reopenArchimonsterSoulSale,
   reopenRuneSale,
   trackerStorage,
   updateTrade,
@@ -21,11 +25,15 @@ export function useTracker() {
   return {
     state,
     addTrade,
+    addArchimonsterSoul,
     addShatteringRune,
+    completeArchimonsterSoulSale,
     completeSale,
     completeRuneSale,
     updateTrade,
+    reopenArchimonsterSoulSale,
     reopenRuneSale,
+    deleteArchimonsterSoul,
     deleteShatteringRune,
     deleteTrade,
   };

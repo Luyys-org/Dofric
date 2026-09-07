@@ -21,6 +21,7 @@ import { extractKamaValues, sumKamaValues } from "@/lib/kama-tracker/ocr";
 import { useTracker } from "@/lib/kama-tracker/use-tracker";
 import { useLanguage } from "@/app/components/language-provider";
 import {
+  type ArchimonsterSoul,
   type CommercialType,
   type SaleStatus,
   type ShatteringRune,
@@ -41,16 +42,20 @@ const sortOptions: { value: SortKey; label: TranslationKey }[] = [
 
 const tesseractAssetPath = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/tesseract`;
 const itemCatalogPath = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/items.json`;
+const archimonsterSoulCatalogPath = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/archimonster-souls.json`;
 
 interface DofusItemOption {
   id: number;
   names: Record<Language, string>;
 }
 
-let itemCatalogPromise: Promise<DofusItemOption[]> | null = null;
+const itemCatalogPromises = new Map<string, Promise<DofusItemOption[]>>();
 
-function loadItemCatalog() {
-  itemCatalogPromise ??= fetch(itemCatalogPath)
+function loadItemCatalog(path: string) {
+  const existingCatalog = itemCatalogPromises.get(path);
+  if (existingCatalog) return existingCatalog;
+
+  const catalogPromise = fetch(path)
     .then(async (response) => {
       if (!response.ok) throw new Error("Unable to load the item catalog.");
       const catalog: unknown = await response.json();
@@ -67,10 +72,11 @@ function loadItemCatalog() {
       });
     })
     .catch((error: unknown) => {
-      itemCatalogPromise = null;
+      itemCatalogPromises.delete(path);
       throw error;
     });
-  return itemCatalogPromise;
+  itemCatalogPromises.set(path, catalogPromise);
+  return catalogPromise;
 }
 
 function getNumber(formData: FormData, field: string) {
@@ -130,7 +136,8 @@ function TradeForm({
   const { addTrade, updateTrade } = useTracker();
   const { language, t } = useLanguage();
   const editing = Boolean(entry);
-  const [itemName, setItemName] = useState(entry?.itemName ?? "");
+  const isArchimonsterSession = commercialType === "archimonster-sell";
+  const [itemName, setItemName] = useState(entry?.itemName ?? (isArchimonsterSession ? t("archimonsters.defaultSessionName") : ""));
   const [itemCatalog, setItemCatalog] = useState<DofusItemOption[]>([]);
   const [itemCatalogState, setItemCatalogState] = useState<"loading" | "ready" | "error">("loading");
   const [itemPickerOpen, setItemPickerOpen] = useState(false);
@@ -140,8 +147,9 @@ function TradeForm({
   const [ocrState, setOcrState] = useState<"idle" | "loading" | "error">("idle");
 
   useEffect(() => {
+    if (isArchimonsterSession) return;
     let active = true;
-    loadItemCatalog()
+    loadItemCatalog(itemCatalogPath)
       .then((catalog) => {
         if (!active) return;
         setItemCatalog(catalog);
@@ -153,7 +161,7 @@ function TradeForm({
     return () => {
       active = false;
     };
-  }, []);
+  }, [isArchimonsterSession]);
 
   const normalizedItemName = itemName.trim().toLocaleLowerCase();
   const itemSuggestions = normalizedItemName
@@ -204,7 +212,7 @@ function TradeForm({
     const formData = new FormData(event.currentTarget);
     const name = String(formData.get("itemName") ?? "").trim();
     const cost = getNumber(formData, "entryCost");
-    const quantity = getNumber(formData, "quantity");
+    const quantity = isArchimonsterSession ? 1 : getNumber(formData, "quantity");
 
     if (!name || cost < 0 || quantity <= 0) return;
 
@@ -222,22 +230,18 @@ function TradeForm({
 
   return (
     <Dialog
-      description={editing ? t("form.editEntryDescription") : t("form.newEntryDescription")}
+      description={editing ? t(isArchimonsterSession ? "archimonsters.editEntryDescription" : "form.editEntryDescription") : t(isArchimonsterSession ? "archimonsters.newEntryDescription" : "form.newEntryDescription")}
       onClose={onClose}
       title={editing ? t("entry.edit") : t("ledger.newEntry")}
     >
       <form className="dialog-form" onSubmit={handleSubmit}>
         <div className="form-grid">
           <div className="form-field full">
-            <label htmlFor="itemName">{t("form.itemName")}</label>
-            <div className="item-picker">
-              <input aria-autocomplete="list" aria-controls="dofus-item-options" aria-expanded={itemPickerOpen && itemSuggestions.length > 0} autoComplete="off" className="field-control" disabled={itemCatalogState === "loading"} id="itemName" name="itemName" onBlur={() => setItemPickerOpen(false)} onChange={(event) => { setItemName(event.target.value); setItemPickerOpen(true); }} onFocus={() => setItemPickerOpen(true)} onKeyDown={(event) => { if (event.key === "Escape") setItemPickerOpen(false); }} placeholder={itemCatalogState === "loading" ? t("form.loadingItems") : t("form.searchItems")} required role="combobox" value={itemName} />
-              {itemPickerOpen && itemSuggestions.length > 0 && <ul className="item-suggestions" id="dofus-item-options" role="listbox">{itemSuggestions.map((item) => <li key={item.id}><button aria-selected={itemName === item.names[language]} onMouseDown={(event) => event.preventDefault()} onClick={() => { setItemName(item.names[language]); setItemPickerOpen(false); }} role="option" type="button">{item.names[language]}</button></li>)}</ul>}
-            </div>
-            {itemCatalogState === "error" && <p className="item-catalog-error" role="alert">{t("form.itemLoadError")}</p>}
+            <label htmlFor="itemName">{t(isArchimonsterSession ? "archimonsters.sessionName" : "form.itemName")}</label>
+            {isArchimonsterSession ? <input className="field-control" id="itemName" name="itemName" onChange={(event) => setItemName(event.target.value)} required value={itemName} /> : <><div className="item-picker"><input aria-autocomplete="list" aria-controls="dofus-item-options" aria-expanded={itemPickerOpen && itemSuggestions.length > 0} autoComplete="off" className="field-control" disabled={itemCatalogState === "loading"} id="itemName" name="itemName" onBlur={() => setItemPickerOpen(false)} onChange={(event) => { setItemName(event.target.value); setItemPickerOpen(true); }} onFocus={() => setItemPickerOpen(true)} onKeyDown={(event) => { if (event.key === "Escape") setItemPickerOpen(false); }} placeholder={itemCatalogState === "loading" ? t("form.loadingItems") : t("form.searchItems")} required role="combobox" value={itemName} />{itemPickerOpen && itemSuggestions.length > 0 && <ul className="item-suggestions" id="dofus-item-options" role="listbox">{itemSuggestions.map((item) => <li key={item.id}><button aria-selected={itemName === item.names[language]} onMouseDown={(event) => event.preventDefault()} onClick={() => { setItemName(item.names[language]); setItemPickerOpen(false); }} role="option" type="button">{item.names[language]}</button></li>)}</ul>}</div>{itemCatalogState === "error" && <p className="item-catalog-error" role="alert">{t("form.itemLoadError")}</p>}</>}
           </div>
           <div className="form-field">
-            <label htmlFor="entryCost">{t("form.entryCost")}</label>
+            <label htmlFor="entryCost">{t(isArchimonsterSession ? "archimonsters.sessionExpense" : "form.entryCost")}</label>
             <input className="field-control" id="entryCost" min="0" name="entryCost" onChange={(event) => setEntryCost(event.target.value)} required step="1" type="number" value={entryCost} />
             <div className="ocr-control">
               <label className="upload-button">
@@ -250,10 +254,10 @@ function TradeForm({
             {ocrState === "error" && <p className="ocr-error" role="alert">{t("form.ocrError")}</p>}
             {ocrValues.length > 0 && <div className="ocr-results"><div><strong>{t("form.pricesFound", { count: ocrValues.length })}</strong><span>{t("form.kamasSelected", { value: formatKamas(sumKamaValues(ocrValues, selectedOcrValues), language) })}</span></div><ul>{ocrValues.map((value, index) => <li key={`${value}-${index}`}><label><input checked={selectedOcrValues[index]} onChange={() => toggleOcrValue(index)} type="checkbox" /><span>{formatKamas(value, language)} {t("dashboard.kamas")}</span></label></li>)}</ul></div>}
           </div>
-          <div className="form-field" style={{ alignContent: "start", gridTemplateRows: "max-content max-content" }}>
+          {!isArchimonsterSession && <div className="form-field" style={{ alignContent: "start", gridTemplateRows: "max-content max-content" }}>
             <label htmlFor="quantity">{t("form.quantity")}</label>
             <input className="field-control" defaultValue={entry?.quantity ?? 1} id="quantity" min="1" name="quantity" required step="1" style={{ alignSelf: "start", height: 38 }} type="number" />
-          </div>
+          </div>}
           <div className="form-field full">
             <label htmlFor="acquiredAt">{t("ledger.entryDate")}</label>
             <input className="field-control" defaultValue={entry?.acquiredAt ?? toDateInputValue()} id="acquiredAt" name="acquiredAt" required type="date" />
@@ -388,6 +392,80 @@ function RuneManager({
   );
 }
 
+function ArchimonsterSoulSaleForm({ entry, onClose, soul }: { entry: TradeEntry; onClose: () => void; soul: ArchimonsterSoul }) {
+  const { completeArchimonsterSoulSale } = useTracker();
+  const { t } = useLanguage();
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const sellPrice = getNumber(formData, "sellPrice");
+    if (sellPrice < 0) return;
+    completeArchimonsterSoulSale(entry.id, soul.id, { sellPrice, soldAt: String(formData.get("soldAt")) });
+    onClose();
+  }
+
+  return (
+    <Dialog description={t("archimonsters.recordDescription", { quantity: soul.quantity, name: soul.name })} onClose={onClose} title={t("archimonsters.recordSale")}>
+      <form className="dialog-form" onSubmit={handleSubmit}>
+        <div className="form-grid">
+          <div className="form-field full"><label htmlFor="soulSellPrice">{t("sale.sellPrice")}</label><input autoFocus className="field-control" id="soulSellPrice" min="0" name="sellPrice" required step="1" type="number" /></div>
+          <div className="form-field full"><label htmlFor="soulSoldAt">{t("sale.saleDate")}</label><input className="field-control" defaultValue={toDateInputValue()} id="soulSoldAt" name="soldAt" required type="date" /></div>
+        </div>
+        <div className="dialog-actions"><button className="secondary-button" onClick={onClose} type="button">{t("form.cancel")}</button><button className="primary-button" type="submit"><Check aria-hidden="true" size={16} />{t("sale.recordSale")}</button></div>
+      </form>
+    </Dialog>
+  );
+}
+
+function ArchimonsterSoulManager({ entry, onClose, onRecordSale }: { entry: TradeEntry; onClose: () => void; onRecordSale: (soul: ArchimonsterSoul) => void }) {
+  const { addArchimonsterSoul, deleteArchimonsterSoul, reopenArchimonsterSoulSale } = useTracker();
+  const { language, t } = useLanguage();
+  const [soulName, setSoulName] = useState("");
+  const [catalog, setCatalog] = useState<DofusItemOption[]>([]);
+  const [catalogState, setCatalogState] = useState<"loading" | "ready" | "error">("loading");
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const souls = entry.archimonsterSouls ?? [];
+  const normalizedSoulName = soulName.trim().toLocaleLowerCase();
+  const suggestions = normalizedSoulName ? catalog.filter((soul) => soul.names[language].toLocaleLowerCase().includes(normalizedSoulName)).slice(0, 50) : [];
+
+  useEffect(() => {
+    let active = true;
+    loadItemCatalog(archimonsterSoulCatalogPath)
+      .then((items) => { if (active) { setCatalog(items); setCatalogState("ready"); } })
+      .catch(() => { if (active) setCatalogState("error"); });
+    return () => { active = false; };
+  }, []);
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const quantity = getNumber(new FormData(event.currentTarget), "quantity");
+    if (!soulName.trim() || quantity <= 0) return;
+    addArchimonsterSoul(entry.id, { name: soulName, quantity });
+    setSoulName("");
+    event.currentTarget.reset();
+  }
+
+  return (
+    <Dialog description={t("archimonsters.description", { name: entry.itemName })} onClose={onClose} title={t("archimonsters.manageTitle")}>
+      <div className="rune-manager">
+        <form className="rune-add-form" onSubmit={handleSubmit}>
+          <label className="sr-only" htmlFor="soulName">{t("archimonsters.soulName")}</label>
+          <div className="item-picker">
+            <input aria-autocomplete="list" aria-controls="archimonster-soul-options" aria-expanded={pickerOpen && suggestions.length > 0} autoComplete="off" className="field-control" disabled={catalogState === "loading"} id="soulName" onBlur={() => setPickerOpen(false)} onChange={(event) => { setSoulName(event.target.value); setPickerOpen(true); }} onFocus={() => setPickerOpen(true)} onKeyDown={(event) => { if (event.key === "Escape") setPickerOpen(false); }} placeholder={catalogState === "loading" ? t("form.loadingItems") : t("archimonsters.soulName")} required role="combobox" value={soulName} />
+            {pickerOpen && suggestions.length > 0 && <ul className="item-suggestions" id="archimonster-soul-options" role="listbox">{suggestions.map((soul) => <li key={soul.id}><button aria-selected={soulName === soul.names[language]} onMouseDown={(event) => event.preventDefault()} onClick={() => { setSoulName(soul.names[language]); setPickerOpen(false); }} role="option" type="button">{soul.names[language]}</button></li>)}</ul>}
+          </div>
+          <label className="sr-only" htmlFor="soulQuantity">{t("form.quantity")}</label>
+          <input className="field-control" defaultValue="1" id="soulQuantity" min="1" name="quantity" required step="1" type="number" />
+          <button className="secondary-button" type="submit"><CirclePlus aria-hidden="true" size={16} />{t("archimonsters.add")}</button>
+        </form>
+        {catalogState === "error" && <p className="item-catalog-error" role="alert">{t("archimonsters.itemLoadError")}</p>}
+        {souls.length === 0 ? <div className="empty-runes"><p>{t("archimonsters.none")}</p></div> : <ul className="rune-list">{souls.map((soul) => <li key={soul.id}><div className="rune-detail"><strong>{soul.name}</strong><small>{t("runes.quantity", { count: soul.quantity })}{soul.soldAt && ` · ${t("runes.soldDate", { date: formatDate(soul.soldAt, language) })}`}</small></div><div className="rune-sale"><span className="numeric">{soul.sellPrice === null ? "-" : formatKamas(soul.sellPrice, language)}</span><span className={soul.status === "SOLD" ? "status is-sold" : "status is-open"}>{t(soul.status === "SOLD" ? "status.sold" : "status.notSold")}</span>{soul.status === "SOLD" ? <button className="icon-button" onClick={() => reopenArchimonsterSoulSale(entry.id, soul.id)} title={t("archimonsters.reopen")} type="button"><Undo2 aria-hidden="true" size={16} /></button> : <button className="icon-button" onClick={() => onRecordSale(soul)} title={t("archimonsters.recordSale")} type="button"><Check aria-hidden="true" size={17} /></button>}<button className="icon-button" onClick={() => deleteArchimonsterSoul(entry.id, soul.id)} title={t("archimonsters.delete")} type="button"><Trash2 aria-hidden="true" size={16} /></button></div></li>)}</ul>}
+      </div>
+    </Dialog>
+  );
+}
+
 function sortEntries(entries: TradeEntry[], sort: SortKey) {
   return entries.toSorted((first, second) => {
     switch (sort) {
@@ -414,7 +492,10 @@ export function Ledger({ commercialType }: { commercialType: CommercialType }) {
   const [selling, setSelling] = useState<TradeEntry | null>(null);
   const [managingRuneEntryId, setManagingRuneEntryId] = useState<string | null>(null);
   const [sellingRune, setSellingRune] = useState<{ entry: TradeEntry; rune: ShatteringRune } | null>(null);
+  const [managingSoulEntryId, setManagingSoulEntryId] = useState<string | null>(null);
+  const [sellingSoul, setSellingSoul] = useState<{ entry: TradeEntry; soul: ArchimonsterSoul } | null>(null);
   const managedRuneEntry = state.entries.find((entry) => entry.id === managingRuneEntryId) ?? null;
+  const managedSoulEntry = state.entries.find((entry) => entry.id === managingSoulEntryId) ?? null;
   const normalizedQuery = query.trim().toLocaleLowerCase();
   const entries = sortEntries(
     state.entries.filter((entry) => entry.commercialType === commercialType && (status === "all" || entry.status === status) && entry.itemName.toLocaleLowerCase().includes(normalizedQuery)),
@@ -436,13 +517,15 @@ export function Ledger({ commercialType }: { commercialType: CommercialType }) {
         <span className="result-count">{entries.length} {t(entries.length === 1 ? "ledger.entry" : "ledger.entries")}</span>
       </div>
       <div className="ledger-table-wrap">
-        {entries.length === 0 ? <div className="empty-table"><CirclePlus aria-hidden="true" size={28} /><p>{t("ledger.noMatchingEntries")}</p><button className="primary-button" onClick={() => setCreateOpen(true)} type="button">{t("ledger.addFirstEntry")}</button></div> : <table className="ledger-table"><thead><tr><th>{t("ledger.item")}</th><th>{t("ledger.entryDate")}</th><th>{t("ledger.quantityShort")}</th><th>{t("ledger.cost")}</th><th>{t("ledger.sale")}</th><th>{t("ledger.profit")}</th><th>{t("ledger.status")}</th><th><span className="sr-only">{t("ledger.actions")}</span></th></tr></thead><tbody>{entries.map((entry) => { const profit = getEntryProfit(entry); const isShatteringEntry = entry.commercialType === "shattering"; const isOpen = entry.status !== "SOLD"; const statusLabel = t(entry.status === "PARTIALLY_SOLD" ? "status.partiallySold" : entry.status === "SOLD" ? "status.sold" : "status.notSold"); return <tr key={entry.id}><td className="item-cell"><strong>{entry.itemName}</strong>{entry.notes && <small>{entry.notes}</small>}</td><td>{formatDate(entry.acquiredAt, language)}</td><td>{entry.quantity}</td><td className="numeric">{formatKamas(entry.entryCost, language)}</td><td className="numeric">{entry.sellPrice === null ? "-" : formatKamas(entry.sellPrice, language)}</td><td className={profit === null ? "numeric" : profit >= 0 ? "profit positive" : "profit negative"}>{profit === null ? "-" : `${profit >= 0 ? "+" : "-"}${formatKamas(Math.abs(profit), language)}`}</td><td><span className={entry.status === "SOLD" ? "status is-sold" : entry.status === "PARTIALLY_SOLD" ? "status is-partial" : "status is-open"}>{statusLabel}</span></td><td><div className="row-actions">{isShatteringEntry && <button className="icon-button" onClick={() => setManagingRuneEntryId(entry.id)} title={t("runes.manage")} type="button"><ListPlus aria-hidden="true" size={17} /></button>}{isOpen && <button className="icon-button" onClick={() => setSelling(entry)} title={t(isShatteringEntry ? "sale.forceCompleteEntry" : "sale.recordSale")} type="button"><Check aria-hidden="true" size={17} /></button>}<button className="icon-button" onClick={() => setEditing(entry)} title={t("entry.edit")} type="button"><Pencil aria-hidden="true" size={16} /></button><button className="icon-button" onClick={() => deleteTrade(entry.id)} title={t("entry.delete")} type="button"><Trash2 aria-hidden="true" size={16} /></button></div></td></tr>; })}</tbody></table>}
+        {entries.length === 0 ? <div className="empty-table"><CirclePlus aria-hidden="true" size={28} /><p>{t("ledger.noMatchingEntries")}</p><button className="primary-button" onClick={() => setCreateOpen(true)} type="button">{t("ledger.addFirstEntry")}</button></div> : <table className="ledger-table"><thead><tr><th>{t("ledger.item")}</th><th>{t("ledger.entryDate")}</th><th>{t("ledger.quantityShort")}</th><th>{t("ledger.cost")}</th><th>{t("ledger.sale")}</th><th>{t("ledger.profit")}</th><th>{t("ledger.status")}</th><th><span className="sr-only">{t("ledger.actions")}</span></th></tr></thead><tbody>{entries.map((entry) => { const profit = getEntryProfit(entry); const isShatteringEntry = entry.commercialType === "shattering"; const isArchimonsterEntry = entry.commercialType === "archimonster-sell"; const isOpen = entry.status !== "SOLD"; const statusLabel = t(entry.status === "PARTIALLY_SOLD" ? "status.partiallySold" : entry.status === "SOLD" ? "status.sold" : "status.notSold"); return <tr key={entry.id}><td className="item-cell"><strong>{entry.itemName}</strong>{entry.notes && <small>{entry.notes}</small>}</td><td>{formatDate(entry.acquiredAt, language)}</td><td>{entry.quantity}</td><td className="numeric">{formatKamas(entry.entryCost, language)}</td><td className="numeric">{entry.sellPrice === null ? "-" : formatKamas(entry.sellPrice, language)}</td><td className={profit === null ? "numeric" : profit >= 0 ? "profit positive" : "profit negative"}>{profit === null ? "-" : `${profit >= 0 ? "+" : "-"}${formatKamas(Math.abs(profit), language)}`}</td><td><span className={entry.status === "SOLD" ? "status is-sold" : entry.status === "PARTIALLY_SOLD" ? "status is-partial" : "status is-open"}>{statusLabel}</span></td><td><div className="row-actions">{isShatteringEntry && <button className="icon-button" onClick={() => setManagingRuneEntryId(entry.id)} title={t("runes.manage")} type="button"><ListPlus aria-hidden="true" size={17} /></button>}{isArchimonsterEntry && <button className="icon-button" onClick={() => setManagingSoulEntryId(entry.id)} title={t("archimonsters.manage")} type="button"><ListPlus aria-hidden="true" size={17} /></button>}{isOpen && !isArchimonsterEntry && <button className="icon-button" onClick={() => setSelling(entry)} title={t(isShatteringEntry ? "sale.forceCompleteEntry" : "sale.recordSale")} type="button"><Check aria-hidden="true" size={17} /></button>}<button className="icon-button" onClick={() => setEditing(entry)} title={t("entry.edit")} type="button"><Pencil aria-hidden="true" size={16} /></button><button className="icon-button" onClick={() => deleteTrade(entry.id)} title={t("entry.delete")} type="button"><Trash2 aria-hidden="true" size={16} /></button></div></td></tr>; })}</tbody></table>}
       </div>
       {createOpen && <TradeForm commercialType={commercialType} onClose={() => setCreateOpen(false)} />}
       {editing && <TradeForm commercialType={commercialType} entry={editing} onClose={() => setEditing(null)} />}
       {selling && <SaleForm entry={selling} onClose={() => setSelling(null)} />}
       {managedRuneEntry && <RuneManager entry={managedRuneEntry} onClose={() => setManagingRuneEntryId(null)} onRecordSale={(rune) => { setManagingRuneEntryId(null); setSellingRune({ entry: managedRuneEntry, rune }); }} />}
       {sellingRune && <RuneSaleForm entry={sellingRune.entry} onClose={() => setSellingRune(null)} rune={sellingRune.rune} />}
+      {managedSoulEntry && <ArchimonsterSoulManager entry={managedSoulEntry} onClose={() => setManagingSoulEntryId(null)} onRecordSale={(soul) => { setManagingSoulEntryId(null); setSellingSoul({ entry: managedSoulEntry, soul }); }} />}
+      {sellingSoul && <ArchimonsterSoulSaleForm entry={sellingSoul.entry} onClose={() => setSellingSoul(null)} soul={sellingSoul.soul} />}
     </div>
   );
 }
