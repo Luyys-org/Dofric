@@ -58,51 +58,47 @@ function TimelineControl({
   );
 }
 
-function CommercialBarChart({
-  label,
-  timeline,
-}: {
-  label: "Sales" | "Expenses";
-  timeline: Timeline;
-}) {
+function CommercialBarChart({ timeline }: { timeline: Timeline }) {
   const { state } = useTracker();
   const { language, t } = useLanguage();
-  const labelText = t(label === "Sales" ? "dashboard.sales" : "dashboard.expenses");
   const totals = COMMERCIAL_TYPES.map((commercialType) => ({
     commercialType,
-    total: getCommercialTotals(state, commercialType, timeline)[
-      label === "Sales" ? "sales" : "expenses"
-    ],
+    ...getCommercialTotals(state, commercialType, timeline),
   }));
-  const maximum = Math.max(...totals.map(({ total }) => total), 1);
+  const maximum = Math.max(
+    ...totals.flatMap(({ sales, expenses }) => [sales, expenses]),
+    1,
+  );
 
   return (
-    <section className="chart-panel" aria-labelledby={`${label.toLowerCase()}-chart-title`}>
+    <section className="chart-panel" aria-labelledby="commercial-chart-title">
       <div className="panel-heading">
         <div>
           <p className="eyebrow">{t("dashboard.byCommercialType")}</p>
-          <h2 id={`${label.toLowerCase()}-chart-title`}>{labelText}</h2>
+          <h2 id="commercial-chart-title">{t("dashboard.salesAndExpenses")}</h2>
         </div>
-        <span className={label === "Sales" ? "chart-key income" : "chart-key expense"}>
-          <i aria-hidden="true" />{t("dashboard.kamas")}
+        <span className="chart-keys">
+          <span className="chart-key income"><i aria-hidden="true" />{t("dashboard.sales")}</span>
+          <span className="chart-key expense"><i aria-hidden="true" />{t("dashboard.expenses")}</span>
         </span>
       </div>
-      <div className="bar-chart" role="list" aria-label={`${labelText} ${t("dashboard.byCommercialType").toLocaleLowerCase()}`}>
-        {totals.map(({ commercialType, total }) => {
-          const height = total === 0 ? 0 : Math.max((total / maximum) * 100, 8);
+      <div className="bar-chart-wrap">
+        <div className="bar-chart" role="list" aria-label={t("dashboard.byCommercialType")}>
+        {totals.map(({ commercialType, expenses, sales }) => {
+          const salesHeight = sales === 0 ? 0 : Math.max((sales / maximum) * 100, 8);
+          const expensesHeight = expenses === 0 ? 0 : Math.max((expenses / maximum) * 100, 8);
           return (
             <div className="bar-group" key={commercialType} role="listitem">
-              <strong>{formatKamas(total, language)}</strong>
+              <div className="bar-values"><strong>{formatKamas(sales, language)}</strong><strong>{formatKamas(expenses, language)}</strong></div>
               <div className="bar-track" aria-hidden="true">
-                <div
-                  className={label === "Sales" ? "bar income" : "bar expense"}
-                  style={{ height: `${height}%` }}
-                />
+                <div className="bar income" style={{ height: `${salesHeight}%` }} />
+                <div className="bar expense" style={{ height: `${expensesHeight}%` }} />
               </div>
               <span>{t(commercialTextKeys[commercialType].label)}</span>
             </div>
           );
         })}
+        </div>
       </div>
     </section>
   );
@@ -183,7 +179,7 @@ export function Dashboard() {
         <article className="summary-card"><p>{t("dashboard.capitalCommitted")}</p><strong>{formatKamas(totals.expenses, language)}</strong><small>{t("dashboard.kamasInvested")}</small></article>
         <article className="summary-card"><p>{t("dashboard.openListings")}</p><strong>{totals.openCount}</strong><small>{t("dashboard.waitingForSale")}</small></article>
       </section>
-      <section className="chart-grid"><CommercialBarChart label="Sales" timeline={timeline} /><CommercialBarChart label="Expenses" timeline={timeline} /></section>
+      <CommercialBarChart timeline={timeline} />
       <section className="latest-section" aria-labelledby="latest-movements">
         <div className="panel-heading"><div><p className="eyebrow">{t("dashboard.activity")}</p><h2 id="latest-movements">{t("dashboard.latestMovements")}</h2></div></div>
         <div className="movement-grid">{COMMERCIAL_TYPES.map((commercialType) => <RecentMovements commercialType={commercialType} key={commercialType} />)}</div>
